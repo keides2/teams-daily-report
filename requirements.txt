@@ -1,0 +1,4 @@
+requests
+openpyxl
+pywin32
+python-dotenv

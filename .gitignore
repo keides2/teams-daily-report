@@ -1,0 +1,56 @@
+# 環境変数
+.env
+.env.local
+
+# 旧仕様・非公開ディレクトリ
+.github/
+evac/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+ENV/
+
+# ログファイル
+*.log
+
+# CSVファイル
+*.csv
+
+# HTMLファイル
+*.html
+
+# 処理済みID（個人データ）
+processed_mail_ids.json
+
+# Excelファイル（個人データ）
+*.xlsm
+*.xlsx
+*.xls
+
+# IDE設定
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS生成ファイル
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 一時ファイル
+*.tmp
+*.bak
+~$*
