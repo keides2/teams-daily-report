@@ -3,6 +3,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
+![teams-daily-report](Gemini_Generated_Image_ko1xckko1xckko1x.png)
+
 Teams のグループチャットに投稿した内容を **Outlook 共有** を起点に取得し、  
 ローカル PC 上の **Excel 日報** に自動追記するツールです。
 
@@ -202,7 +204,7 @@ EXCEL_PATH=C:\Users\yamada\OneDrive\業務内容報告書\{fiscal_year}年度\{m
 | 205 | | 計画1 | 実績1 |
 | 206 | | 計画2 | 実績2 |
 | 207 | | | 実績3 |
-| 208 | 12/24 (火) | | 実績4 |
+| 208 | 12/24 | | 実績4 |
 | 209 | (水) | | 実績5 |
 | 210 | | | 実績6 |
 | 211 | | （余白） | （余白） |
@@ -210,14 +212,6 @@ EXCEL_PATH=C:\Users\yamada\OneDrive\業務内容報告書\{fiscal_year}年度\{m
 | 213 | | 次の日付の入力開始 | |
 
 スクリプトは自動的に各列の空き行を探して書き込みます。
-| 26 | | | 実績2 |
-| 27 | | | 実績3 |
-| 28 | | | 実績4 |
-| 29 | | | 実績5 |
-| 30 | | | |
-| 31 | | | |
-| 32 | 12/2 | 計画内容 | |
-| ... | ... | ... | ... |
 
 ---
 
