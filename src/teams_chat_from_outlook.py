@@ -91,7 +91,7 @@ def load_state():
 def save_state(ids):
     STATE_FILE.write_text(json.dumps(list(ids), ensure_ascii=False, indent=2), encoding="utf-8")
 
-def extract_daily_reports(text: str):
+def extract_daily_reports(text: str, mail_received_date=None):
     """
     return list of (kind, summary, date) tuples
     1つのメッセージから複数の日報（計画・結果）を抽出
@@ -117,7 +117,11 @@ def extract_daily_reports(text: str):
             text = parts[-1]
     
     reports = []
-    current_year = dt.date.today().year
+    # メール受信日がある場合はその年を基準に、ない場合は今日の年を使用
+    if mail_received_date:
+        base_year = mail_received_date.year
+    else:
+        base_year = dt.date.today().year
     
     # #日報計画を全て抽出（日付付き）
     for m in re.finditer(r"#日報計画\s+(\d{1,2})/(\d{1,2})\s*(?:要約[:：]\s*)?(.+?)(?:\n|$)", text):
@@ -126,7 +130,20 @@ def extract_daily_reports(text: str):
         summary = m.group(3).strip()[:50]
         if summary:
             try:
-                report_date = dt.date(current_year, month, day)
+                # 年をまたぐ場合の処理（メール受信日を基準に判定）
+                if mail_received_date:
+                    # メール受信月と報告月を比較して年を決定
+                    if mail_received_date.month == 12 and month == 1:
+                        # 12月に受信して1月の日付を指定した場合は翌年
+                        year = base_year + 1
+                    elif mail_received_date.month == 1 and month == 12:
+                        # 1月に受信して12月の日付を指定した場合は前年
+                        year = base_year - 1
+                    else:
+                        year = base_year
+                else:
+                    year = base_year
+                report_date = dt.date(year, month, day)
                 reports.append(("plan", summary, report_date))
             except ValueError:
                 print(f"  警告: 無効な日付 {month}/{day}")
@@ -138,7 +155,20 @@ def extract_daily_reports(text: str):
         summary = m.group(3).strip()[:50]
         if summary:
             try:
-                report_date = dt.date(current_year, month, day)
+                # 年をまたぐ場合の処理（メール受信日を基準に判定）
+                if mail_received_date:
+                    # メール受信月と報告月を比較して年を決定
+                    if mail_received_date.month == 12 and month == 1:
+                        # 12月に受信して1月の日付を指定した場合は翌年
+                        year = base_year + 1
+                    elif mail_received_date.month == 1 and month == 12:
+                        # 1月に受信して12月の日付を指定した場合は前年
+                        year = base_year - 1
+                    else:
+                        year = base_year
+                else:
+                    year = base_year
+                report_date = dt.date(year, month, day)
                 reports.append(("result", summary, report_date))
             except ValueError:
                 print(f"  警告: 無効な日付 {month}/{day}")
@@ -150,7 +180,20 @@ def extract_daily_reports(text: str):
         summary = m.group(3).strip()[:50]
         if summary and "計画" not in summary and "結果" not in summary:
             try:
-                report_date = dt.date(current_year, month, day)
+                # 年をまたぐ場合の処理（メール受信日を基準に判定）
+                if mail_received_date:
+                    # メール受信月と報告月を比較して年を決定
+                    if mail_received_date.month == 12 and month == 1:
+                        # 12月に受信して1月の日付を指定した場合は翌年
+                        year = base_year + 1
+                    elif mail_received_date.month == 1 and month == 12:
+                        # 1月に受信して12月の日付を指定した場合は前年
+                        year = base_year - 1
+                    else:
+                        year = base_year
+                else:
+                    year = base_year
+                report_date = dt.date(year, month, day)
                 reports.append(("result", summary, report_date))
             except ValueError:
                 print(f"  警告: 無効な日付 {month}/{day}")
@@ -172,7 +215,9 @@ def extract_daily_reports(text: str):
         # #日報（日付なし）
         for m in re.finditer(r"#日報\s+(.+?)(?:\n|$)", text):
             summary = m.group(1).strip()[:50]
-            if summary and "計画" not in summary and "結果" not in summary and not re.match(r"\d{1,2}/\d{1,2}", summary):
+            if (summary and "計画" not in summary and
+                    "結果" not in summary and
+                    not re.match(r"\d{1,2}/\d{1,2}", summary)):
                 reports.append(("result", summary, None))
     
     return reports
@@ -278,7 +323,7 @@ for mail in target_folder.Items:
 
     body = mail.Body or ""
     subject = mail.Subject or "(件名なし)"
-    reports = extract_daily_reports(body)
+    reports = extract_daily_reports(body, default_date)
 
     if reports:
         print(f"✓ 処理: {subject[:50]}")
