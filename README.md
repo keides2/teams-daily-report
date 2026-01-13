@@ -343,15 +343,28 @@ python src\teams_chat_from_outlook.py
 
 ### デスクトップショートカット作成（オプション）
 
-毎回コマンドを入力するのが面倒な場合、バッチファイルを作成：
+毎回コマンドを入力するのが面倒な場合、バッチファイルを作成できます。
 
-```powershell
-@"
+#### 方法1: 簡単な方法（推奨）
+
+1. リポジトリ内の `日報更新.bat.example` をコピー
+2. デスクトップに `日報更新.bat` として保存
+3. ダブルクリックで実行
+
+`日報更新.bat.example` の内容:
+```bat
 @echo off
-cd /d C:\Users\{あなたのユーザー名}\Docs\GitHub\keides2\teams-daily-report
+cd /d %~dp0
 python src\teams_chat_from_outlook.py
 pause
-"@ | Out-File -FilePath "$env:USERPROFILE\Desktop\日報更新.bat" -Encoding ascii
+```
+
+**重要**: `%~dp0` は自動的にバッチファイルのあるディレクトリに移動するため、どこに配置しても動作します。
+
+#### 方法2: PowerShellで自動生成
+
+```powershell
+Copy-Item 日報更新.bat.example "$env:USERPROFILE\Desktop\日報更新.bat"
 ```
 
 デスクトップの「日報更新.bat」をダブルクリックするだけで実行できます。

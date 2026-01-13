@@ -2,6 +2,11 @@
 .env
 .env.local
 
+# バッチファイル（個人用）
+日報更新.bat
+*.bat
+!日報更新.bat.example
+
 # 旧仕様・非公開ディレクトリ
 .github/
 evac/

@@ -1,0 +1,4 @@
+@echo off
+cd /d %~dp0
+python src\teams_chat_from_outlook.py
+pause
