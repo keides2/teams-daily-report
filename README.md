@@ -5,74 +5,83 @@
 
 ![teams-daily-report](Gemini_Generated_Image_ko1xckko1xckko1x.png)
 
-Teams のグループチャットに投稿した内容を **Outlook 共有** を起点に取得し、  
-ローカル PC 上の **Excel 日報** に自動追記するツールです。
-
-本ツールは以下の制約下でも動作する設計になっています。
-
-- Microsoft Graph の **アプリ登録が不可**
-- Power Automate / Power Apps を使わない
-- 管理者権限を必要としない
-- Teams の通常運用（チャット投稿）を変えない
+ローカル PC 上の **Excel 日報** への書き込みを自動化する、**2本の独立したツール**を収録しています。
 
 ---
 
-## 全体アーキテクチャ
+## ツール1: Copilot スラッシュコマンド（`daily_report_writer`）
 
+VS Code の Copilot Chat から **その場でテキストを入力するだけ** で Excel 日報に書き込みます。  
+Teams・Outlook・pywin32 はいっさい不要です。
+
+```mermaid
+flowchart TD
+    A["🖥️ VS Code<br/>Copilot Chat<br/>Agent モード"]
+    B["🤖 Copilot Agent<br/>prompts/*.prompt.md"]
+    C["🐍 daily_report_writer.py<br/>--mode plan | result<br/>--summary '...'<br/>--date MM/DD"]
+    D["📊 Excel 日報<br/>計画列 / 実績列"]
+
+    A -->|"/daily-plan /daily-result"| B
+    B -->|ターミナル実行| C
+    C -->|openpyxl| D
 ```
-Teams チャット
-  └─ メッセージ … → Outlook で共有
-        ↓
-Outlook（Windows ローカル）
-        ↓
-Python（pywin32）
-  - 日報タグ抽出
-  - 日付情報の解析
-  - 要約（50文字）取得
-  - 重複防止
-        ↓
-Excel（日報テンプレート）
+
+**特徴**
+- Outlook / Teams の操作は不要
+- 日付省略時は今日の日付を自動使用
+- `要約:` プレフィックス不要。入力テキストをそのまま書き込む
+- `.xlsx` / `.xlsm` どちらにも対応
+
+---
+
+## ツール2: Outlook メール経由（`teams_chat_from_outlook`）
+
+Teams チャットを **「Outlookで共有」** し、メールを解析して Excel に一括書き込みします。  
+Microsoft Graph のアプリ登録が不可・管理者権限なしの環境向けの実装です。
+
+```mermaid
+flowchart TD
+    A["💬 Teams チャット"]
+    B["📧 Outlook<br/>Teams日報フォルダ"]
+    C["🐍 teams_chat_from_outlook.py<br/>pywin32"]
+    D["📊 Excel 日報<br/>計画列 / 実績列"]
+
+    P1["タグ抽出<br/>#日報計画 / #日報結果"]
+    P2["日付解析<br/>MM/DD or 受信日"]
+    P3["要約 50文字以内"]
+    P4["重複防止<br/>EntryID 管理"]
+
+    A -->|「Outlook で共有」| B
+    B -->|未処理メール| C
+    C --- P1
+    C --- P2
+    C --- P3
+    C --- P4
+    C -->|openpyxl| D
 ```
+
+**特徴**
+- Microsoft Graph の **アプリ登録不要**
+- Power Automate / Power Apps を使わない
+- 管理者権限不要
+- Teams の通常運用（チャット投稿）を変えない
+- まとめて処理：1日の投稿分を夕方にまとめて Excel へ反映可能
 
 ---
 
 ## チャット投稿ルール（重要）
 
-日報に反映したいメッセージには、以下の形式でタグと要約を記載します。
+| タグ | 書き込み先 | 書式例 |
+|---|---|---|
+| `#日報計画` | 計画列（C列）| `#日報計画 12/25 プロジェクト計画書作成` |
+| `#日報結果` | 実績列（F列）| `#日報結果 12/24 テスト完了` |
+| `#日報` | 実績列（F列、結果扱い）| `#日報 12/20 会議資料作成` |
 
-### 日付を指定する場合（推奨）
-
-過去のチャットを後からまとめて共有する場合や、正確な日付を記録したい場合に使用します。
-
-```
-#日報 12/20 会議資料作成
-#日報計画 12/25 プロジェクト計画書作成
-#日報結果 12/24 テスト完了
-```
-
-### 日付を指定しない場合（後方互換）
-
-メール受信日（Outlookで共有した日）に記録されます。
-
-```
-#日報 ログ保存先不具合対応
-#日報計画 要約:設計レビュー準備
-#日報結果 要約:顧客対応完了
-```
-
-### タグの種類
-
-- `#日報計画` - 計画列（C列）に記録
-- `#日報結果` - 実績列（F列）に記録
-- `#日報` - 実績列（F列）に記録（結果として扱う）
-
-### ルール
-
-- 要約は **50文字以内**（自動で切り詰められます）
-- `要約:` プレフィックスは省略可能
-- 1つのメッセージに複数のタグを含めることが可能
-- 投稿者は **自分／他人どちらでも可**
-  - 日報に残したいメッセージだけを Outlook 共有する
+- 日付省略時はメール受信日に記録
+- `要約:` プレフィックスは省略可能。**空白・カンマはどちらの場合も使用可**（テキストは行末まで取得）  
+  例: `#日報計画 12/20 会議資料の作成, 確認`
+- 要約は **50文字以内**（自動切り詰め）
+- 1メッセージに複数タグ可。投稿者は自分/他人どちらでも可
 
 ---
 
@@ -120,6 +129,23 @@ EXCEL_DEPARTMENT=営業部-01.庶務
 EXCEL_TEAM=営業1課
 EXCEL_USER_NAME=山田太郎
 ```
+
+**環境変数一覧**:
+
+| 変数名 | 必須/省略可 | デフォルト値 | 説明 | 対象ツール |
+|---|---|---|---|---|
+| `EXCEL_PATH` | **必須**（推奨） | なし | Excel ファイルのフルパス（テンプレート変数使用可）| 両方 |
+| `OUTLOOK_FOLDER` | 省略可 | `Teams日報` | Outlook のフォルダ名 | ツール2のみ |
+| `PLAN_COL` | 省略可 | `C` | 計画列 | 両方 |
+| `RESULT_COL` | 省略可 | `F` | 実績列 | 両方 |
+| `DATE_COL` | 省略可 | `B` | 日付列 | 両方 |
+| `ROWS_PER_DAY` | 省略可 | `6` | 1日あたりの入力行数 | 両方 |
+| `EXCEL_COMPANY` | 省略可※ | `株式会社サンプル` | 会社名（`EXCEL_PATH` 未設定時のパス生成用）| 両方 |
+| `EXCEL_DEPARTMENT` | 省略可※ | `部署名-01.庶務事項` | 部署名（同上）| 両方 |
+| `EXCEL_TEAM` | 省略可※ | `チームA` | チーム名（同上）| 両方 |
+| `EXCEL_USER_NAME` | 省略可※ | `山田太郎` | 氏名（同上）| 両方 |
+
+※ `EXCEL_PATH` を直接指定する場合は不要。未指定時はこれらでパスを自動生成。
 
 **ポイント**:
 - `.env` ファイルは個人情報を含むため、Git にコミットされません
@@ -213,6 +239,54 @@ EXCEL_PATH=C:\Users\yamada\OneDrive\業務内容報告書\{fiscal_year}年度\{m
 
 スクリプトは自動的に各列の空き行を探して書き込みます。
 
+#### サンプル（テスト実行後の状態）
+
+![Excel サンプル](docs/excel_structure.png)
+
+- C18: 計画「設計レビューの準備」（`--mode plan --date 2/21`）
+- F18: Excel の自動コピー式（計画と同内容が自動反映）
+- F19: 実績「テスト完了」（`--mode result --date 2/21`、offset=1 で2行目から書き込み）
+
+---
+
+## Copilot Chat スラッシュコマンド
+
+VS Code の Copilot Chat（**Agent モード**）から直接 Excel に書き込めます。  
+Outlook や Teams の操作は不要です。
+
+### セットアップ
+
+`.env` の `EXCEL_PATH` を設定するだけで使用できます（追加インストール不要）。
+
+### 使い方
+
+Copilot Chat を **Agent モード** に切り替えて入力するだけです。
+
+```
+/daily-plan 設計レビューの準備
+/daily-plan 2/21 午後の会議資料作成
+```
+
+```
+/daily-result バグ修正完了
+/daily-result 2/20 顧客対応完了
+```
+
+### 入力ルール
+
+| 要素 | 書き方 | 例 |
+|---|---|---|
+| 日付あり | `MM/DD テキスト` | `2/21 設計レビュー` |
+| 日付なし | テキストのみ | `バグ修正完了`（今日の日付を自動使用）|
+| `要約:` プレフィックス | 不要 | テキストをそのまま書けばOK |
+
+### 書き込み先
+
+| コマンド | 書き込み列 | `.env` 設定 |
+|---|---|---|
+| `/daily-plan` | 計画列（デフォルト C列）| `PLAN_COL` |
+| `/daily-result` | 実績列（デフォルト F列）の **2行目以降**（1行目は計画の自動コピー先）| `RESULT_COL` |
+
 ---
 
 ## requirements.txt
@@ -234,6 +308,31 @@ python-dotenv
 
 ## 実行
 
+### Copilot スラッシュコマンド（推奨）
+
+VS Code Copilot Chat を **Agent モード** にして入力：
+
+```
+/daily-plan 設計レビューの準備
+/daily-result 2/21 テスト完了
+```
+
+ Copilot Agent が自動的に以下のコマンドを実行します：
+
+```powershell
+python src\daily_report_writer.py --mode plan --summary "設計レビューの準備"
+python src\daily_report_writer.py --mode result --date 2/21 --summary "テスト完了"
+```
+
+直接コマンドで実行することも可能です：
+
+```powershell
+python src\daily_report_writer.py --mode plan --summary "要約テキスト"
+python src\daily_report_writer.py --mode result --date 2/21 --summary "要約テキスト"
+```
+
+### Outlook メール経由（従来モード）
+
 ```powershell
 python src\teams_chat_from_outlook.py
 ```
@@ -246,21 +345,7 @@ python src\teams_chat_from_outlook.py
 - Excel の指定日付行に追記
 - 処理済みメールは EntryID で管理（`processed_mail_ids.json` に保存、重複防止）
 
-### 処理の流れ
-
-1. **メール取得**: Outlook の `Teams日報` フォルダから未処理メールを取得
-2. **日報抽出**: メール本文から `#日報` タグを検索
-3. **日付判定**: 
-   - タグに日付指定（例: `#日報 12/20`）があればその日付を使用
-   - 日付指定がなければメール受信日を使用
-4. **Excel書き込み**:
-   - 計画（`#日報計画`）→ C列の1行目
-   - 実績（`#日報結果`, `#日報`）→ F列の2〜6行目（空き行を自動検索）
-5. **重複防止**: 処理済みメールIDを保存
-
-### 再実行する場合
-
-処理済みメールIDをクリアすれば再処理できます：
+再実行する場合は処理済みIDをクリアします：
 
 ```powershell
 Remove-Item processed_mail_ids.json
@@ -299,22 +384,15 @@ python src\teams_chat_from_outlook.py
 
 **「Outlookで共有」は投稿の都度、スクリプトは1日1回**
 
-```
-【朝】
-Teams投稿: #日報計画 12/24 要約: 設計書作成
-→ すぐに「Outlookで共有」をクリック
+```mermaid
+flowchart LR
+    A["☀️ 朝<br/>#日報計画 投稿<br/>Outlook 共有"]
+    B["🍱 昼<br/>#日報結果 投稿<br/>Outlook 共有"]
+    C["🌆 夕方<br/>#日報結果 投稿<br/>Outlook 共有"]
+    D["🏠 帰宅前<br/>python<br/>teams_chat_from_outlook.py"]
+    E["📊 Excel<br/>3件まとめ反映"]
 
-【昼】
-Teams投稿: #日報結果 12/24 要約: 設計書50%完成
-→ すぐに「Outlookで共有」をクリック
-
-【夕方】
-Teams投稿: #日報結果 12/24 要約: 設計書完成、レビュー依頼
-→ すぐに「Outlookで共有」をクリック
-
-【帰宅前（17:00-18:00）】
-python src\teams_chat_from_outlook.py
-→ 朝・昼・夕の3件がまとめてExcelに反映
+    A --> B --> C --> D --> E
 ```
 
 **メリット**:
@@ -341,34 +419,6 @@ python src\teams_chat_from_outlook.py
 
 → スクリプト実行で3件すべてが処理されます
 
-### デスクトップショートカット作成（オプション）
-
-毎回コマンドを入力するのが面倒な場合、バッチファイルを作成できます。
-
-#### 方法1: 簡単な方法（推奨）
-
-1. リポジトリ内の `日報更新.bat.example` をコピー
-2. デスクトップに `日報更新.bat` として保存
-3. ダブルクリックで実行
-
-`日報更新.bat.example` の内容:
-```bat
-@echo off
-cd /d %~dp0
-python src\teams_chat_from_outlook.py
-pause
-```
-
-**重要**: `%~dp0` は自動的にバッチファイルのあるディレクトリに移動するため、どこに配置しても動作します。
-
-#### 方法2: PowerShellで自動生成
-
-```powershell
-Copy-Item 日報更新.bat.example "$env:USERPROFILE\Desktop\日報更新.bat"
-```
-
-デスクトップの「日報更新.bat」をダブルクリックするだけで実行できます。
-
 ---
 
 ## 設計上のポイント
@@ -381,22 +431,6 @@ Copy-Item 日報更新.bat.example "$env:USERPROFILE\Desktop\日報更新.bat"
 - **日付の柔軟性** - タグに日付を明示することで過去分も正確に記録可能
 - **重複防止** - EntryID による処理済み管理で同じメールを二重処理しない
 - **環境変数で設定管理** - `.env` ファイルで個人情報を管理、ソースコード修正不要
-
-### 環境変数化のメリット
-
-✅ **個人情報の保護**
-- `.env` ファイルは `.gitignore` に含まれ、Git にコミットされない
-- 氏名、会社名などの個人情報をリポジトリに含めない
-- パブリックリポジトリとして安全に公開可能
-
-✅ **簡単な環境設定**
-- `.env.example` をコピーして編集するだけ
-- ソースコード修正不要
-- チームメンバーへの展開が容易
-
-✅ **複数環境対応**
-- 開発環境・本番環境で異なる設定を簡単に使い分け
-- テスト用の設定ファイルも作成可能
 
 ---
 
@@ -411,10 +445,17 @@ teams-daily-report/
 ├── .env                          # 環境変数設定（各自作成、Gitにコミットしない）
 ├── .gitignore                    # Git除外設定
 ├── processed_mail_ids.json        # 処理済みメールID（自動生成）
+├── .github/
+│   ├── copilot-instructions.md    # Copilot 共通ルール
+│   └── prompts/
+│       ├── daily-plan.prompt.md   # /daily-plan スラッシュコマンド定義
+│       └── daily-result.prompt.md # /daily-result スラッシュコマンド定義
 ├── src/
-│   └── teams_chat_from_outlook.py # メイン実行スクリプト
+│   ├── teams_chat_from_outlook.py # Outlook メール経由モード（従来）
+│   └── daily_report_writer.py    # CLI 直接書き込みモード（スラッシュコマンド用）
 ├── tests/
 │   ├── README.md                  # テストスクリプトの説明書
+│   ├── create_sample_excel.py     # テスト用サンプル Excel 生成
 │   ├── debug_mail_content.py      # メール内容デバッグ
 │   ├── debug_mapi_properties.py   # MAPIプロパティ調査
 │   ├── test_extract.py            # タグ抽出ロジックテスト
@@ -435,197 +476,18 @@ teams-daily-report/
 
 ## トラブルシューティング
 
-### Excelファイルが開かれているエラー
+| 症状 | 確認・対処 | デバッグスクリプト |
+|---|---|---|
+| Excel が開かれているエラー | Excel ファイルを閉じてから再実行 | - |
+| Excel ファイルが見つからない | `.env` の `EXCEL_PATH` / テンプレート変数を確認 | `tests\check_current_excel_dates.py` |
+| 日付行が見つからない | B列に datetime 型で日付入力・シート名を確認 | `tests\check_current_excel_dates.py` |
+| メールが処理されない | タグ・フォルダ名・テキストの有無を確認 | `tests\debug_mail_content.py` |
+| 重複書き込みされる | `processed_mail_ids.json` の更新状況を確認 | `tests\test_extract.py` |
+| 処理済みを再処理したい | `Remove-Item processed_mail_ids.json` して再実行 | - |
 
-```
-エラー: Excelファイルが開かれています
-```
-
-**解決方法**:
-1. Excelファイルを閉じてください
-2. もう一度スクリプトを実行してください
-
-スクリプトは実行中にExcelファイルを読み書きするため、Excelで開いていると競合が発生します。
-
-### Excel ファイルが見つからない
-
-```
-エラー: Excelファイルが見つかりません
-```
-
-**確認項目**:
-- `.env` ファイルの `EXCEL_PATH` 設定を確認
-- テンプレート変数（`{fiscal_year}`, `{month_folder}`, `{month_name}`）が正しく置換されているか確認
-- 年度・月の計算ロジック（4月始まりの年度計算）を確認
-
-**デバッグ**: 
-```powershell
-python tests\check_current_excel_dates.py
-```
-
-### 日付行が見つからない / セル位置がずれる
-
-```
-✗ スキップ: 2025-12-24 の日付行が見つかりません
-```
-
-**確認項目**:
-- Excel のB列に日付が datetime 型で入力されているか確認
-- シート名が月のパターン（例: "12月"）を含んでいるか確認
-- `.env` ファイルの `DATE_COL`, `PLAN_COL`, `RESULT_COL` 設定を確認
-
-**Excel構造の前提**:
-- 日付セル（B列）の **3行上** から入力エリアが始まる
-- 1日あたり6行の入力エリア + 2行の余白 = 合計8行
-
-**デバッグ**: 
-```powershell
-python tests\check_current_excel_dates.py  # 日付行の位置を確認
-```
-
-### メールが処理されない
-
-```
-✗ スキップ: (件名)
-  理由: 日報タグまたは要約が見つかりません
-```
-
-**確認項目**:
-- Outlook フォルダ名が `.env` の `OUTLOOK_FOLDER` 設定と一致しているか確認
-- メール本文に `#日報計画`, `#日報結果`, または `#日報` タグがあるか確認
-- タグの後に要約テキストがあるか確認（空白のみは無効）
-
-**対応パターン**:
-```
-#日報計画 12/24 要約: XXX      ← 日付指定あり（推奨）
-#日報結果 12/24 要約: XXX      ← 日付指定あり（推奨）
-#日報 12/24 XXX                ← 結果として処理
-#日報計画 要約: XXX            ← 日付なし（受信日を使用）
-```
-
-**デバッグ**: 
-```powershell
-python tests\debug_mail_content.py  # メール内容とタグ検出を確認
-```
-
-### 処理済みメールを再処理したい
-
-```powershell
-Remove-Item processed_mail_ids.json
-python src\teams_chat_from_outlook.py
-```
-
-`processed_mail_ids.json` を削除すると、すべてのメールが再処理されます。
-
----
-
-## デバッグツール
-
-問題が発生した場合は、`tests` フォルダー内のデバッグスクリプトを使用してください。
 詳細は [tests/README.md](tests/README.md) を参照してください。
 
-| スクリプト | 用途 |
-|-----------|------|
-| `check_current_excel_dates.py` | 現在の.env設定でExcelの日付行を確認 |
-| `debug_mail_content.py` | Outlookメールの内容とタグ検出を確認 |
-| `list_outlook_folders.py` | Outlookフォルダー一覧を表示 |
-| `test_extract.py` | タグ抽出ロジックをテスト |
-
----
-
-### 同じ内容が複数回書き込まれる
-
-- `processed_mail_ids.json` が正しく更新されているか確認
-- メール本文のプレビュー部分は自動的に除外されます（"Microsoft Teams" 以降のみ処理）
-- **デバッグ**: `python tests\test_extract.py` でタグ抽出ロジックを確認
-
----
-
-## 処理済みメール管理 (`processed_mail_ids.json`)
-
-### 📝 ファイルの役割
-
-このツールは、`processed_mail_ids.json` ファイルで処理済みメールを管理します。
-
-**保存される情報:**
-```json
-[
-  "00000000C431A3DBFEA37F47AD3334F526F6C83F07004E194AD5...",
-  "00000000C431A3DBFEA37F47AD3334F526F6C83F07004E194AD5...",
-  ...
-]
-```
-
-各文字列は **Outlook メールの EntryID**（一意の識別子）です。
-
-### 🎯 重複処理の防止
-
-**動作の流れ:**
-
-1. **起動時**: `processed_mail_ids.json` から処理済みIDを読み込み
-2. **メール処理**: 各メールの EntryID を確認
-   - 既に処理済み → スキップ
-   - 未処理 → Excelに書き込み、IDをリストに追加
-3. **終了時**: 更新されたIDリストを `processed_mail_ids.json` に保存
-
-### 📊 Excel行番号の管理方法
-
-**Q: Excelの何行目に入力したかという情報は記録していますか？**
-
-**A: いいえ、記録していません。**
-
-代わりに、**毎回Excelファイルを読み取って空セルを探します**。
-
-```python
-# 実行のたびに、Excelファイルの実際の状態を確認
-for offset in range(0, ROWS_PER_DAY):
-    cell = ws[f"{PLAN_COL}{target_row}"]
-    if not cell.value:  # 空セルを発見
-        cell.value = summary  # ここに書き込み
-        break
-```
-
-**動作例:**
-
-```
-【1日目実行後】
-C205: 会議の準備
-C206: 資料作成
-C207: (空)
-
-【2日目実行時】
-→ C205を確認: 値あり → スキップ
-→ C206を確認: 値あり → スキップ
-→ C207を確認: 空セル → ✅ ここに書き込み
-```
-
-**設計の利点:**
-- ✅ 状態管理が不要（Excelファイルが唯一の真実の情報源）
-- ✅ 手動編集に対応（ユーザーがExcelで行を削除/追加しても問題ない）
-- ✅ シンプルな実装
-
-### 🔄 処理済みメールを再処理したい場合
-
-1. `processed_mail_ids.json` を削除（または該当IDを削除）
-2. スクリプトを再実行
-
-⚠️ **注意**: 既にExcelに書き込まれた内容は自動削除されません。手動で削除するか、空セルに追記されます。
-
-### 🚫 なぜ `.gitignore` に含まれるのか？
-
-**3つの理由:**
-
-1. **個人情報**: あなたのOutlookメールボックス内のメール履歴情報
-2. **環境固有**: EntryIDは各ユーザーのOutlook環境ごとに異なる
-3. **運用データ**: ソースコードではなく、実行時に自動生成されるログファイルの性質
-
-**類似する除外ファイル:**
-```gitignore
-.env                      # 個人の環境設定
-processed_mail_ids.json   # 個人の処理履歴
-*.xlsm                    # 個人のExcelファイル
-*.log                     # ログファイル
-```
+> **`processed_mail_ids.json`**: 処理済みメールの EntryID を保存するファイル（自動生成）。Excel の書き込み行は毎回 Excel を読んで空セルを検索するため、行番号は記録しません。
 
 ---
 
@@ -636,19 +498,6 @@ processed_mail_ids.json   # 個人の処理履歴
 - **過去分の一括登録** - 日付を明示して過去のチャットをまとめて登録
 - **チーム内の情報共有** - 他メンバーの重要な発言も日報に記録可能
 - **依頼対応の記録** - 「誰の依頼で何をしたか」を残す用途
-
----
-
-## 今後の拡張案（任意）
-
-- Azure OpenAI / Azure AI による
-  - チャット内容の自動要約
-  - 日報の書式チェック
-  - 週報・月報の自動生成
-- 発言者名の Excel 自動記録
-- 処理ログの詳細保存（CSVやログファイル）
-- 複数人の日報を一括処理
-- Outlook ルールの自動設定スクリプト
 
 ---
 
