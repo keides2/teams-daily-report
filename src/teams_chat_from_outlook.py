@@ -264,7 +264,7 @@ except PermissionError:
     exit(1)
 except Exception as e:
     print("=" * 80)
-    print(f"エラー: Excelファイルの読み込みに失敗しました")
+    print("エラー: Excelファイルの読み込みに失敗しました")
     print("=" * 80)
     print()
     print(f"詳細: {type(e).__name__}: {e}")
@@ -340,7 +340,7 @@ for mail in target_folder.Items:
             date_groups[target_date].append((kind, summary))
         
         # 日付ごとにExcelに書き込み
-        for target_date, items in date_groups.items():
+        for target_date, day_items in date_groups.items():
             # メールの日付に対応する行を検索（日付表示行）
             date_row = find_row_by_date(ws, target_date)
             if date_row is None:
@@ -357,7 +357,7 @@ for mail in target_folder.Items:
             plan_row_offset = 0  # 計画列は0行目から
             result_row_offset = 0  # 結果列も0行目から
             
-            for kind, summary in items:
+            for kind, summary in day_items:
                 print(f"    - {kind}: {summary}")
                 
                 if kind == "plan":
@@ -441,7 +441,7 @@ except PermissionError:
     exit(1)
 except Exception as e:
     print("=" * 80)
-    print(f"エラー: Excelファイルの保存に失敗しました")
+    print("エラー: Excelファイルの保存に失敗しました")
     print("=" * 80)
     print()
     print(f"詳細: {type(e).__name__}: {e}")
