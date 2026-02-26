@@ -24,7 +24,8 @@ tools: ["run_in_terminal"]
 
 ### ステップ2: コマンドの実行
 
-ワークスペースルート（`c:\Users\HP\Docs\GitHub\keides2\teams-daily-report`）で以下を実行する。
+`teams-daily-report` リポジトリのルートディレクトリ（`src/daily_report_writer.py` が存在する場所）で以下を実行する。
+パスはハードコードせず、ターミナルのカレントディレクトリをリポジトリルートに合わせて実行すること。
 
 **日付あり**の場合:
 ```powershell
