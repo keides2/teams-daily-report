@@ -123,11 +123,31 @@ mklink /D .github\prompts C:\Users\<ユーザー名>\.copilot\prompts
 
 ### Excel ファイルのパスを変更する場合
 
-プロンプトファイル内の `EXCEL_PATH` を編集：
+Excel ファイルのパスは、プロンプトファイルではなく **環境変数**（または `.env`）で設定します。
 
-```markdown
-EXCEL_PATH = r"C:\path\to\your\日報.xlsx"
+`src/daily_report_writer.py` は起動時に `EXCEL_PATH` を参照し、`{fiscal_year}` / `{month_folder}` / `{month_name}` を自動置換して当月ファイルを特定します。
+
+#### 例: Windows のユーザー環境変数に設定（推奨）
+
+PowerShell で 1 回だけ実行（以後は永続）:
+
+```powershell
+[Environment]::SetEnvironmentVariable(
+   "EXCEL_PATH",
+   'C:\path\to\your\\{fiscal_year}年度\\{month_folder}\\（{month_name}_氏名）業務内容報告書.xlsm',
+   "User"
+)
 ```
+
+反映確認（新しいターミナルで）:
+
+```powershell
+$env:EXCEL_PATH
+```
+
+#### 例: `.env` に設定（このリポジトリを開いて使う場合）
+
+`.env.example` を `.env` にコピーして `EXCEL_PATH=` を設定します（`.env` は Git 管理対象にしないでください）。
 
 ### 書き込み先の列を変更する場合
 
