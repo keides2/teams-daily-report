@@ -8,7 +8,9 @@
 !日報更新.bat.example
 
 # 旧仕様・非公開ディレクトリ
-.github/
+.github/*
+!.github/prompts/
+!.github/copilot-instructions.md
 evac/
 
 # Python
