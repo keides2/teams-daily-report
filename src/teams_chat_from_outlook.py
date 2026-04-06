@@ -97,11 +97,11 @@ def extract_daily_reports(text: str, mail_received_date=None):
     1つのメッセージから複数の日報（計画・結果）を抽出
     
     対応パターン:
-    1. #日報計画 MM/DD 要約:xxxxx
-    2. #日報結果 MM/DD 要約:xxxxx
-    3. #日報計画 MM/DD xxxxx
-    4. #日報結果 MM/DD xxxxx
-    5. #日報 MM/DD xxxxx (結果として扱う)
+    1. #日報計画 MM/DD 要約:xxxxx  ← xxxxx に空白を含む文章が書ける（例: 設計 午前中）
+    2. #日報結果 MM/DD 要約:xxxxx  ← xxxxx に空白を含む文章が書ける（例: テスト 完了）
+    3. #日報計画 MM/DD xxxxx       ← xxxxx に空白を含んでも行末まで取得できるが、MM/DD との区切りが
+    4. #日報結果 MM/DD xxxxx          視覚的にわかりにくくなるため、空白なしを推奨
+    5. #日報 MM/DD xxxxx (結果として扱う)  ← 同上
     6. 日付なしの場合は None を返す（メール受信日を使用）
     
     Note: Teamsのメール本文にはプレビュー部分と実際のメッセージ部分が含まれる。
