@@ -18,7 +18,9 @@ Private Sub Workbook_Open()
 End Sub
 
 Private Sub Workbook_BeforeSave(ByVal SaveAsUI As Boolean, Cancel As Boolean)
-    RefreshAllReportSheets
+    ' レイアウト初期化は Workbook_Open 時のみ実施。
+    ' 保存時に実行すると、祝日（平日扱い）に手入力した "-" が消えるため削除。
+    ' RefreshAllReportSheets  ← 削除
 End Sub
 
 ' 手動実行用
