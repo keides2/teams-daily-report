@@ -205,7 +205,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    load_dotenv()
+    load_dotenv(override=True)
 
     outlook_folder = os.getenv("OUTLOOK_FOLDER", "Teams日報")
     state_file = Path("processed_mail_ids.json")

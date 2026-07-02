@@ -17,7 +17,7 @@ import win32com.client
 from openpyxl import load_workbook
 
 # .env ファイルから環境変数を読み込み
-load_dotenv()
+load_dotenv(override=True)
 
 # ===== 設定 =====
 OUTLOOK_FOLDER = os.getenv("OUTLOOK_FOLDER", "Teams日報")

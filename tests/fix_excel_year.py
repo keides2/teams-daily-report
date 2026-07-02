@@ -9,7 +9,7 @@ from openpyxl import load_workbook
 from dotenv import load_dotenv
 
 # 環境変数の読み込み
-load_dotenv()
+load_dotenv(override=True)
 
 # 処理対象の月リスト（1月、2月、3月）
 TARGET_MONTHS = [1, 2, 3]

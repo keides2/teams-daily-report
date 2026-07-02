@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from openpyxl import load_workbook
 
 # .env ファイルから環境変数を読み込み
-load_dotenv()
+load_dotenv(override=True)
 
 # 現在の月に基づいてファイルパスを動的に生成
 today = dt.date.today()
