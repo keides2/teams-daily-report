@@ -1,4 +1,43 @@
 @echo off
-cd /d %~dp0
-python src\teams_chat_from_outlook.py
+setlocal
+set "SCRIPT_DIR=%~dp0"
+if "%SCRIPT_DIR:~-1%"=="\" set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
+set "PYTHON_EXE="
+
+if not defined PYTHON_EXE (
+	python -c "import dotenv, openpyxl, win32com.client" >nul 2>&1
+	if not errorlevel 1 set "PYTHON_EXE=python"
+)
+
+if not defined PYTHON_EXE (
+	if exist "%SCRIPT_DIR%\.venv\Scripts\python.exe" (
+		"%SCRIPT_DIR%\.venv\Scripts\python.exe" -c "import dotenv, openpyxl, win32com.client" >nul 2>&1
+		if not errorlevel 1 set "PYTHON_EXE=%SCRIPT_DIR%\.venv\Scripts\python.exe"
+	)
+)
+
+if not defined PYTHON_EXE goto python_missing
+
+cd /d "%SCRIPT_DIR%" || goto repo_missing
+"%PYTHON_EXE%" src\teams_chat_from_outlook.py
+
+:done
+endlocal
 pause
+exit /b 0
+
+:python_missing
+echo No usable Python environment found.
+echo Expected primary runtime: python on PATH ^(current environment used Python 3.10^)
+echo Fallback runtime: %SCRIPT_DIR%\.venv\Scripts\python.exe
+echo Install dependencies with: python -m pip install -r requirements.txt
+goto failed
+
+:repo_missing
+echo Repository directory not found.
+goto failed
+
+:failed
+endlocal
+pause
+exit /b 1
