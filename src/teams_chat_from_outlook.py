@@ -10,7 +10,11 @@ import json
 import os
 import re
 import datetime as dt
+import shutil
+import tempfile
+import time
 from pathlib import Path
+from zipfile import BadZipFile, is_zipfile
 
 from dotenv import load_dotenv
 import win32com.client
@@ -64,10 +68,10 @@ else:
     base_folder = os.getenv("EXCEL_BASE_FOLDER", "業務内容報告書")
     team = os.getenv("EXCEL_TEAM", "チームA")
     user_name = os.getenv("EXCEL_USER_NAME", "山田太郎")
-    
+
     # OneDriveベースパス
     onedrive_base = f"C:\\Users\\{username}\\OneDrive - {company}"
-    
+
     EXCEL_PATH = Path(
         f"{onedrive_base}\\{department}\\{category}\\"
         f"{base_folder}\\{fiscal_year}年度\\{month_folder}\\{team}\\"
@@ -88,14 +92,62 @@ def load_state():
         return set(json.loads(STATE_FILE.read_text(encoding="utf-8")))
     return set()
 
+
 def save_state(ids):
-    STATE_FILE.write_text(json.dumps(list(ids), ensure_ascii=False, indent=2), encoding="utf-8")
+    STATE_FILE.write_text(
+        json.dumps(list(ids), ensure_ascii=False, indent=2),
+        encoding="utf-8"
+    )
+
+
+def load_workbook_with_retry(
+    excel_path: Path,
+    retries: int = 3,
+    delay_seconds: int = 2,
+):
+    last_error = None
+
+    for attempt in range(1, retries + 1):
+        temp_path = None
+        try:
+            if not is_zipfile(excel_path):
+                raise BadZipFile("File is not a zip file")
+
+            temp_dir = Path(tempfile.gettempdir())
+            temp_path = temp_dir / (
+                f"{excel_path.stem}_{os.getpid()}_{attempt}"
+                f"{excel_path.suffix}"
+            )
+            shutil.copy2(excel_path, temp_path)
+
+            if not is_zipfile(temp_path):
+                raise BadZipFile("Copied file is not a valid zip file")
+
+            return load_workbook(temp_path, keep_vba=True, data_only=False)
+        except (PermissionError, BadZipFile, OSError) as error:
+            last_error = error
+            if attempt == retries:
+                break
+            print(
+                f"Excel読み込み再試行 {attempt}/{retries}: "
+                f"{type(error).__name__}: {error}"
+            )
+            time.sleep(delay_seconds)
+        finally:
+            if temp_path and temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except OSError:
+                    pass
+
+    raise last_error
+
 
 def extract_daily_reports(text: str, mail_received_date=None):
     """
     return list of (kind, summary, date) tuples
     1つのメッセージから複数の日報（計画・結果）を抽出
-    
+
     対応パターン:
     1. #日報計画 MM/DD 要約:xxxxx  ← xxxxx に空白を含む文章が書ける（例: 設計 午前中）
     2. #日報結果 MM/DD 要約:xxxxx  ← xxxxx に空白を含む文章が書ける（例: テスト 完了）
@@ -103,7 +155,7 @@ def extract_daily_reports(text: str, mail_received_date=None):
     4. #日報結果 MM/DD xxxxx          視覚的にわかりにくくなるため、空白なしを推奨
     5. #日報 MM/DD xxxxx (結果として扱う)  ← 同上
     6. 日付なしの場合は None を返す（メール受信日を使用）
-    
+
     Note: Teamsのメール本文にはプレビュー部分と実際のメッセージ部分が含まれる。
           実際のメッセージ部分のみを抽出するため、"Microsoft Teams" 以降を使用。
     """
@@ -115,16 +167,19 @@ def extract_daily_reports(text: str, mail_received_date=None):
         if len(parts) > 1:
             # 後半部分のみを使用（実際のチャットメッセージ）
             text = parts[-1]
-    
+
     reports = []
     # メール受信日がある場合はその年を基準に、ない場合は今日の年を使用
     if mail_received_date:
         base_year = mail_received_date.year
     else:
         base_year = dt.date.today().year
-    
+
     # #日報計画を全て抽出（日付付き）
-    for m in re.finditer(r"#日報計画\s+(\d{1,2})/(\d{1,2})\s*(?:要約[:：]\s*)?(.+?)(?:\n|$)", text):
+    for m in re.finditer(
+        r"#日報計画\s+(\d{1,2})/(\d{1,2})\s*(?:要約[:：]\s*)?(.+?)(?:\n|$)",
+        text,
+    ):
         month = int(m.group(1))
         day = int(m.group(2))
         summary = m.group(3).strip()[:50]
@@ -147,9 +202,12 @@ def extract_daily_reports(text: str, mail_received_date=None):
                 reports.append(("plan", summary, report_date))
             except ValueError:
                 print(f"  警告: 無効な日付 {month}/{day}")
-    
+
     # #日報結果を全て抽出（日付付き）
-    for m in re.finditer(r"#日報結果\s+(\d{1,2})/(\d{1,2})\s*(?:要約[:：]\s*)?(.+?)(?:\n|$)", text):
+    for m in re.finditer(
+        r"#日報結果\s+(\d{1,2})/(\d{1,2})\s*(?:要約[:：]\s*)?(.+?)(?:\n|$)",
+        text,
+    ):
         month = int(m.group(1))
         day = int(m.group(2))
         summary = m.group(3).strip()[:50]
@@ -172,7 +230,7 @@ def extract_daily_reports(text: str, mail_received_date=None):
                 reports.append(("result", summary, report_date))
             except ValueError:
                 print(f"  警告: 無効な日付 {month}/{day}")
-    
+
     # #日報（単独）を全て抽出（日付付き、結果として扱う）
     for m in re.finditer(r"#日報\s+(\d{1,2})/(\d{1,2})\s+(.+?)(?:\n|$)", text):
         month = int(m.group(1))
@@ -197,7 +255,7 @@ def extract_daily_reports(text: str, mail_received_date=None):
                 reports.append(("result", summary, report_date))
             except ValueError:
                 print(f"  警告: 無効な日付 {month}/{day}")
-    
+
     # 日付なしのパターン（後方互換性のため）
     if not reports:
         # #日報計画（日付なし）
@@ -249,7 +307,7 @@ if not EXCEL_PATH.exists():
     raise RuntimeError(f"Excelファイルが見つかりません: {EXCEL_PATH}")
 
 try:
-    wb = load_workbook(EXCEL_PATH, keep_vba=True, data_only=False)
+    wb = load_workbook_with_retry(EXCEL_PATH)
 except PermissionError:
     print("=" * 80)
     print("エラー: Excelファイルが開かれています")
@@ -268,6 +326,16 @@ except Exception as e:
     print("=" * 80)
     print()
     print(f"詳細: {type(e).__name__}: {e}")
+    if isinstance(e, BadZipFile):
+        print()
+        print("考えられる要因:")
+        print("  1. OneDrive の同期または Office の保存処理が終わる前に読み込んだ")
+        print("  2. 一時的に不完全なローカル キャッシュを参照した")
+        print("  3. 対象ファイルが別の処理で更新中だった")
+        print()
+        print("対処の候補:")
+        print("  1. 数秒待ってから再実行する")
+        print("  2. Excel を保存して閉じ、OneDrive の同期表示が落ち着いてから再実行する")
     print()
     print(f"ファイルパス: {EXCEL_PATH}")
     print("=" * 80)
